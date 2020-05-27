@@ -5,7 +5,7 @@ authors = ["gf712 <gil_f.hoben@hotmail.com>"]
 edition = "2018"
 
 [dependencies]
-shogun-rust-procedural = {verion = "0.1.0", path = "lib-procedural"}
+shogun-rust-procedural = {verion = "0.1.0", path = "shogun-procedural-macros"}
 
 [lib]
 name = "shogun_rust"

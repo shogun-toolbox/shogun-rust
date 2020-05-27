@@ -59,7 +59,11 @@ struct sgobject {
 	}
 
 	virtual ~sgobject() {
-		std::visit([](auto&& arg){arg.reset();}, ptr);
+		std::visit([](auto&& arg){
+			if (arg)
+				arg.reset();
+			}, 
+			ptr);
 	}
 
 	Any get_parameter(const char* name) const {
@@ -129,22 +133,31 @@ const char* get_version_main(version_t* ptr) {
 	}
 }
 
-sgobject_t* create_machine(const char* name) {
-	auto obj = create<Machine>(name);
-	auto* ptr = new sgobject_t(obj);
-	return ptr;
+template <typename SGType>
+sgobject_result create_helper(const char* name) {
+	try {
+		auto obj = create<SGType>(name);
+		auto* ptr = new sgobject_t(obj);
+		return {sgobject_result::SUCCESS, ptr};
+	}
+	catch (const std::exception& e) {
+		sgobject_result result;
+		result.return_code = sgobject_result::ERROR;
+		result.result.error = e.what();
+		return result;
+	}
 }
 
-sgobject_t* create_kernel(const char* name) {
-	auto obj = create<Kernel>(name);
-	auto* ptr = new sgobject_t(obj);
-	return ptr;
+sgobject_result create_machine(const char* name) {
+	return create_helper<Machine>(name);
 }
 
-sgobject_t* create_distance(const char* name) {
-	auto obj = create<Distance>(name);
-	auto* ptr = new sgobject_t(obj);
-	return ptr;
+sgobject_result create_kernel(const char* name) {
+	return create_helper<Kernel>(name);
+}
+
+sgobject_result create_distance(const char* name) {
+	return create_helper<Distance>(name);
 }
 
 void destroy_sgobject(sgobject* ptr) {

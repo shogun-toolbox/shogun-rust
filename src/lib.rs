@@ -6,22 +6,24 @@ pub mod shogun {
         use crate::bindings;
         use std::ffi::CStr;
         pub fn sgobject_to_string<T>(obj: *const T) -> &'static str {
-            let c_repr = unsafe{ bindings::to_string(obj as *const _ as *const bindings::sgobject_t) };
+            let c_repr =
+                unsafe { bindings::to_string(obj as *const _ as *const bindings::sgobject_t) };
             let repr = unsafe { CStr::from_ptr(c_repr) };
-            repr.to_str().expect("Failed to get SGObject representation")
+            repr.to_str()
+                .expect("Failed to get SGObject representation")
         }
     }
 
-    use std::ffi::{CString, CStr};
-    use std::str::Utf8Error;
     use crate::bindings;
     use shogun_rust_procedural::SGObject;
+    use std::ffi::{CStr, CString};
     use std::fmt;
+    use std::str::Utf8Error;
 
     trait SGObject: fmt::Display {
         fn to_string(&self) -> &str;
     }
-    
+
     pub struct Version {
         version_ptr: *mut bindings::version_t,
     }
@@ -43,18 +45,18 @@ pub mod shogun {
 
     impl Version {
         pub fn new() -> Self {
-            Version{
-                version_ptr: unsafe{ bindings::create_version() },
+            Version {
+                version_ptr: unsafe { bindings::create_version() },
             }
         }
-    
+
         pub fn main_version(&self) -> Result<&'static str, Utf8Error> {
             let char_ptr = unsafe { bindings::get_version_main(self.version_ptr) };
             let c_str = unsafe { CStr::from_ptr(char_ptr) };
             c_str.to_str()
         }
     }
-    
+
     impl Drop for Version {
         fn drop(&mut self) {
             unsafe { bindings::destroy_version(self.version_ptr) };

@@ -3,6 +3,20 @@ extern "C" {
 	struct sgobject;
 	struct C_Visitor;
 
+	typedef struct version version_t;
+	typedef struct sgobject sgobject_t;
+	typedef struct C_Visitor cvisitor_t;
+	
+	struct sgobject_result
+	{
+		enum {SUCCESS, ERROR} return_code;
+		union ResultUnion
+		{
+			sgobject_t* result;
+			const char* error;
+		} result;
+	};
+
 	enum TYPE {
 		INT32,
 		INT64,
@@ -17,10 +31,6 @@ extern "C" {
 		SG_DISTANCE,
 	};
 
-	typedef struct version version_t;
-	typedef struct sgobject sgobject_t;
-	typedef struct C_Visitor cvisitor_t;
-
 	TYPE get_cvisitor_type(const cvisitor_t*);
 	const char* get_cvisitor_typename(const cvisitor_t*);
 	void* get_cvisitor_pointer(const cvisitor_t*);
@@ -34,10 +44,10 @@ extern "C" {
 	cvisitor_t* sgobject_get(const sgobject_t*, const char*);
 	SG_TYPE sgobject_derived_type(const sgobject_t*);
 
-	sgobject_t* create_machine(const char*);
+	sgobject_result create_machine(const char*);
 	bool train_machine(sgobject_t*);
 
-	sgobject_t* create_kernel(const char*);
+	sgobject_result create_kernel(const char*);
 
-	sgobject_t* create_distance(const char*);
+	sgobject_result create_distance(const char*);
 }

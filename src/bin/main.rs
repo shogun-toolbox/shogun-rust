@@ -1,13 +1,13 @@
-use shogun_rust::shogun::{Version, Machine, Kernel, Distance};
+use shogun_rust::shogun::{Distance, Kernel, Machine, Version};
 
 fn main() {
     let version = Version::new();
     println!("Shogun version {}", version.main_version().unwrap());
 
-    let rf = Machine::new("RandomForest");
+    let rf = Machine::new("RandomForest").unwrap();
     println!("{}", rf);
 
-    let gaussian = Kernel::new("GaussianKernel");
+    let gaussian = Kernel::new("GaussianKernel").unwrap();
     println!("{}", gaussian);
     match gaussian.get("log_width") {
         Ok(value) => match value.downcast_ref::<f64>() {
@@ -31,5 +31,10 @@ fn main() {
             None => println!("m_distance not Distance"),
         },
         Err(msg) => panic!(msg),
+    }
+
+    match Machine::new("RandomForests") {
+        Ok(_) => println!("All good"),
+        Err(msg) => println!("ShogunException: {}", msg),
     }
 }

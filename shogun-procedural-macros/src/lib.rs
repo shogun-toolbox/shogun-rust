@@ -1,7 +1,7 @@
 extern crate proc_macro;
-use syn::{parse_macro_input, DeriveInput, Ident};
-use quote::quote;
 use proc_macro::TokenStream;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput, Ident};
 
 #[proc_macro_derive(SGObject)]
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -9,17 +9,29 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let lower_name = format!("name_{}", name);
     let create_name = format!("create_{}", name);
-    
+
     let lower_name_ident = Ident::new(lower_name.to_lowercase().as_str(), name.span());
     let create_name_ident = Ident::new(create_name.to_lowercase().as_str(), name.span());
-    
+
     let tokens = quote! {
         impl #name {
-            pub fn new(#lower_name_ident: &'static str) -> Self {
+            pub fn new(#lower_name_ident: &'static str) -> Result<Self, String> {
                 let c_string = CString::new(#lower_name_ident).expect("CString::new failed");
-                #name {
-                    ptr: unsafe { bindings::#create_name_ident(c_string.as_ptr()) }
+                let c_ptr = unsafe { bindings::#create_name_ident(c_string.as_ptr()) };
+                unsafe {
+                match c_ptr {
+                    bindings::sgobject_result { return_code: bindings::sgobject_result_SUCCESS,
+                                      result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                                        Ok(#name { ptr })
+                                    },
+                    bindings::sgobject_result { return_code: bindings::sgobject_result_ERROR,
+                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
                 }
+            }
             }
             pub fn get(&self, parameter_name: &'static str) -> Result<Box<dyn std::any::Any>, String> {
                 let c_string = CString::new(parameter_name).expect("CString::new failed");

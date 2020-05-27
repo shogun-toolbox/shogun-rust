@@ -4,13 +4,12 @@ use cmake::Config;
 use std::env;
 use std::path::PathBuf;
 
-fn main() { 
+fn main() {
     println!("cargo:rerun-if-changed=shogun/shogun.cpp");
     println!("cargo:rerun-if-changed=shogun/shogun.h");
     println!("cargo:rerun-if-changed=CMakeLists.txt");
 
-    let dst = Config::new(".")
-        .build();
+    let dst = Config::new(".").build();
 
     println!("cargo:rustc-link-search=native=/usr/lib/x86_64-linux-gnu/");
     println!("cargo:rustc-link-lib=dylib=stdc++");
