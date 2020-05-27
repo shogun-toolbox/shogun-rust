@@ -6,6 +6,10 @@
 
 using namespace shogun;
 
+// taken from cpp reference
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
 struct version {
 	std::unique_ptr<Version> obj;
 };
@@ -18,17 +22,13 @@ struct C_Visitor {
 template <typename>
 struct get_type {};
 
-template <TYPE>
-struct get_name {};
-
 #define STRINGIFY(a) #a
 
 #define DEFINE_TYPE(TYPE_T, TYPE_ENUM)\
 template <>\
 struct get_type<TYPE_T> {\
-	static constexpr TYPE value = TYPE_ENUM;\
-	static constexpr std::string_view name = STRINGIFY(TYPE_T);\
-};\
+	static constexpr std::pair<TYPE, std::string_view> type = {TYPE_ENUM, STRINGIFY(TYPE_T)};\
+};
 
 DEFINE_TYPE(int32_t, INT32)
 DEFINE_TYPE(int64_t, INT64)
@@ -40,32 +40,13 @@ DEFINE_TYPE(std::shared_ptr<SGObject>, SGOBJECT)
 #undef STRINGIFY
 
 class VisitorRegister {
-	VisitorRegister () {
-		register_visitor<float32_t>();
-		register_visitor<float64_t>();
-		register_visitor<int32_t>();
-		register_visitor<int64_t>();
-		register_visitor<std::shared_ptr<SGObject>>();
-	}
-
 	template <typename T>
-	void register_visitor() {
-		using ReturnType = std::conditional_t<is_sg_base<T>::value, std::shared_ptr<SGObject>, T>;
-		Any::register_visitor<T, C_Visitor>(
-			[](auto* val, auto* visitor) {
-				auto* result = new ReturnType;
-				sg_memcpy(result, val, sizeof(ReturnType));
-				visitor->m_type = std::make_pair(get_type<ReturnType>::value, get_type<ReturnType>::name);
-				visitor->m_value = (void*)result;
-			}
-		);
-	}
+	void register_visitor();
+	
+	VisitorRegister();
 
 	public:
-		static VisitorRegister* instance() {
-			static auto object = VisitorRegister{};
-			return &object; 
-		}
+		static VisitorRegister* instance();
 };
 
 struct sgobject {
@@ -95,6 +76,39 @@ struct sgobject {
 		return result;
 	}
 };
+
+VisitorRegister::VisitorRegister () {
+	register_visitor<float32_t>();
+	register_visitor<float64_t>();
+	register_visitor<int32_t>();
+	register_visitor<int64_t>();
+	register_visitor<Kernel>();
+	register_visitor<Machine>();
+	register_visitor<Distance>();
+}
+
+template <typename T>
+void VisitorRegister::register_visitor() {
+	using RegisterType = std::conditional_t<is_sg_base<T>::value, std::shared_ptr<T>, T>;
+	using ReturnType = std::conditional_t<is_sg_base<T>::value, std::shared_ptr<SGObject>, T>;
+
+	Any::register_visitor<RegisterType, C_Visitor>(
+		[](RegisterType* val, auto* visitor) {
+			auto* result = new ReturnType;
+			*result = *val;
+			visitor->m_type = get_type<ReturnType>::type;
+			if constexpr (is_sg_base<T>::value)
+				visitor->m_value = (void*)new sgobject(*val);
+			else
+				visitor->m_value = (void*)result;
+		}
+	);
+}
+
+VisitorRegister* VisitorRegister::instance() {
+	static auto object = VisitorRegister{};
+	return &object; 
+}
 
 version_t* create_version() {
 	auto* ptr = (version_t*)malloc(sizeof(version_t));
@@ -145,11 +159,19 @@ const char* to_string(const sgobject_t* ptr) {
 	}
 }
 
-cvisitor_t* sgobject_get(const sgobject* ptr, const char* name) {
+cvisitor_t* sgobject_get(const sgobject_t* ptr, const char* name) {
 	const auto& param = ptr->get_parameter(name);
 	auto* visitor = new C_Visitor{};
 	param.visit_with(visitor);
 	return visitor;
+}
+
+SG_TYPE sgobject_derived_type(const sgobject_t* ptr) {
+	return std::visit( overloaded {
+		[](const std::shared_ptr<Kernel>&){return SG_TYPE::SG_KERNEL;},
+		[](const std::shared_ptr<Machine>&){return SG_TYPE::SG_MACHINE;},
+		[](const std::shared_ptr<Distance>&){return SG_TYPE::SG_DISTANCE;},
+	}, ptr->ptr);
 }
 
 TYPE get_cvisitor_type(const cvisitor_t* ptr) {

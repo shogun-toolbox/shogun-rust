@@ -30,10 +30,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     bindings::TYPE_FLOAT64 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut f64)}),
                     bindings::TYPE_INT32 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut i32)}),
                     bindings::TYPE_INT64 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut i64)}),
-                    // bindings::TYPE_SGOBJECT => {
-                    //     Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut bindings::sgobject_t)})
-                    // },
-                    x => {
+                    bindings::TYPE_SGOBJECT => {
+                        let obj = unsafe { bindings::get_cvisitor_pointer(c_visitor) as *mut bindings::sgobject_t };
+                        let obj_type = unsafe {bindings::sgobject_derived_type(obj)};
+                        match obj_type {
+                            bindings::SG_TYPE_SG_KERNEL => Ok(Box::new(Kernel{ptr: obj})),
+                            bindings::SG_TYPE_SG_DISTANCE => Ok(Box::new(Distance{ptr: obj})),
+                            bindings::SG_TYPE_SG_MACHINE => Ok(Box::new(Machine{ptr: obj})),
+                            _ => Err(format!("Cannot handle type")),
+                        }
+                    },
+                    _ => {
                         let c_typename = unsafe { CStr::from_ptr(bindings::get_cvisitor_typename(c_visitor)) };
                         Err(format!("Cannot handle type {}", c_typename.to_str().expect("Failed to get typename")))
                     },

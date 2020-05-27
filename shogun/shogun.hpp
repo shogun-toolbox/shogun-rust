@@ -11,6 +11,12 @@ extern "C" {
 		SGOBJECT,
 	};
 	
+	enum SG_TYPE {
+		SG_KERNEL,
+		SG_MACHINE,
+		SG_DISTANCE,
+	};
+
 	typedef struct version version_t;
 	typedef struct sgobject sgobject_t;
 	typedef struct C_Visitor cvisitor_t;
@@ -26,6 +32,7 @@ extern "C" {
 	void destroy_sgobject(sgobject_t*);
 	const char* to_string(const sgobject_t*);
 	cvisitor_t* sgobject_get(const sgobject_t*, const char*);
+	SG_TYPE sgobject_derived_type(const sgobject_t*);
 
 	sgobject_t* create_machine(const char*);
 	bool train_machine(sgobject_t*);
