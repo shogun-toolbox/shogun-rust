@@ -1,0 +1,16 @@
+[package]
+name = "shogun-rust-procedural"
+version = "0.1.0"
+authors = ["gf712 <gil_f.hoben@hotmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[dependencies]
+syn = "1.0"
+quote = "1.0"

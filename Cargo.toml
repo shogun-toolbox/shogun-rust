@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["gf712 <gil_f.hoben@hotmail.com>"]
 edition = "2018"
 
+[dependencies]
+shogun-rust-procedural = {verion = "0.1.0", path = "lib-procedural"}
+
 [lib]
 name = "shogun_rust"
 path = "src/lib.rs"

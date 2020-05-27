@@ -6,12 +6,6 @@ set_target_properties(shogun-c PROPERTIES
                       
 target_link_libraries(shogun-c /home/gf712/shogun/build/src/shogun/libshogun.so /home/gf712/shogun/build/spdlog/src/SpdLog-build/libspdlog.a)
 
-add_executable(test shogun/main.cpp)
-target_link_libraries(test shogun-c)
-
-set_target_properties(test PROPERTIES 
-                      CXX_STANDARD 17)
-
 target_include_directories(shogun-c PRIVATE
                            /home/gf712/shogun/build/src
                            /home/gf712/shogun/src

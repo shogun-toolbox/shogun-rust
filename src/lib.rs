@@ -1,21 +1,43 @@
 mod bindings;
 
 pub mod shogun {
-    use std::ffi::{CString, CStr, c_void};
+
+    mod details {
+        use crate::bindings;
+        use std::ffi::CStr;
+        pub fn sgobject_to_string<T>(obj: *const T) -> &'static str {
+            let c_repr = unsafe{ bindings::to_string(obj as *const _ as *const bindings::sgobject_t) };
+            let repr = unsafe { CStr::from_ptr(c_repr) };
+            repr.to_str().expect("Failed to get SGObject representation")
+        }
+    }
+
+    use std::ffi::{CString, CStr};
     use std::str::Utf8Error;
     use crate::bindings;
+    use shogun_rust_procedural::SGObject;
     use std::fmt;
 
+    trait SGObject: fmt::Display {
+        fn to_string(&self) -> &str;
+    }
+    
     pub struct Version {
         version_ptr: *mut bindings::version_t,
     }
-    
+
+    #[derive(SGObject)]
     pub struct Machine {
-        machine_ptr: *mut bindings::machine_t,
+        ptr: *mut bindings::sgobject,
+    }
+
+    #[derive(SGObject)]
+    pub struct Kernel {
+        ptr: *mut bindings::sgobject,
     }
 
     impl Version {
-        pub fn new() -> Version {
+        pub fn new() -> Self {
             Version{
                 version_ptr: unsafe{ bindings::create_version() },
             }
@@ -27,33 +49,10 @@ pub mod shogun {
             c_str.to_str()
         }
     }
-
-    impl Machine {
-        pub fn new(machine_name: &'static str) -> Machine {
-            let c_string = CString::new(machine_name).expect("CString::new failed");
-            Machine {
-                machine_ptr: unsafe { bindings::create_machine(c_string.as_ptr()) }
-            }
-        }
-    }
     
     impl Drop for Version {
         fn drop(&mut self) {
             unsafe { bindings::destroy_version(self.version_ptr) };
-        }
-    }
-
-    impl Drop for Machine {
-        fn drop(&mut self) {
-            unsafe { bindings::destroy_machine(self.machine_ptr) };
-        }
-    }
-
-    impl fmt::Display for Machine {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let c_repr = unsafe{ bindings::to_string(self.machine_ptr as *const _ as *const bindings::machine_t) };
-            let repr = unsafe { CStr::from_ptr(c_repr) };
-            write!(f, "{}", repr.to_str().expect("Failed to get SGObject representation"))
         }
     }
 }

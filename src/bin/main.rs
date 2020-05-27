@@ -1,4 +1,4 @@
-use shogun_rust::shogun::{Version, Machine};
+use shogun_rust::shogun::{Version, Machine, Kernel};
 
 fn main() {
     let version = Version::new();
@@ -6,4 +6,7 @@ fn main() {
 
     let rf = Machine::new("RandomForest");
     println!("{}", rf);
+
+    let gaussian = Kernel::new("GaussianKernel");
+    println!("{}", gaussian);
 }

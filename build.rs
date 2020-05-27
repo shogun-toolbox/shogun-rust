@@ -17,14 +17,14 @@ fn main() {
     println!("cargo:rustc-link-search={}/lib", dst.display());
     println!("cargo:rustc-link-lib=static=shogun-c");
     println!("cargo:rustc-link-search=/home/gf712/shogun/build/src/shogun");
+    println!("cargo:rustc-env=LD_LIBRARY_PATH=/home/gf712/shogun/build/src/shogun");
     println!("cargo:rustc-link-search=/home/gf712/shogun/build/spdlog/src/SpdLog-build/");
     println!("cargo:rustc-link-lib=dylib=shogun");
     println!("cargo:rustc-link-lib=static=spdlog");
 
     let bindings = bindgen::Builder::default()
-        .clang_arg("-xc++")
         .clang_arg("-Ishogun")
-        .header("shogun/shogun.h")
+        .header("shogun/shogun.hpp")
         .generate()
         .expect("Unable to generate bindings");
 
