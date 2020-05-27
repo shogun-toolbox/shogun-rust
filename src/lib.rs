@@ -36,6 +36,11 @@ pub mod shogun {
         ptr: *mut bindings::sgobject,
     }
 
+    #[derive(SGObject)]
+    pub struct Distance {
+        ptr: *mut bindings::sgobject,
+    }
+
     impl Version {
         pub fn new() -> Self {
             Version{
