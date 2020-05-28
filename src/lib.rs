@@ -24,6 +24,38 @@ pub mod shogun {
         fn to_string(&self) -> &str;
     }
 
+    pub trait SGObjectPut {
+        fn sgobject_put(&self, obj: *mut bindings::sgobject, name: &'static str) -> Option<&'static str>;
+    }
+
+    macro_rules! add_sgobject_put_type {
+        ($put_type:ty, $enum_value:expr) => {
+            impl SGObjectPut for $put_type {
+                fn sgobject_put(&self, obj: *mut bindings::sgobject, parameter_name: &'static str) -> Option<&'static str> {
+                    unsafe {
+                        let c_string = CString::new(parameter_name).expect("CString::new failed");
+                        let type_erased_parameter = std::mem::transmute::<&$put_type, *const std::ffi::c_void>(&self);
+                        match bindings::sgobject_put(obj, c_string.as_ptr(), type_erased_parameter, $enum_value) {
+                            bindings::sgobject_put_result {
+                                return_code: bindings::RETURN_CODE_ERROR,
+                                error: msg,
+                            } => {
+                                let c_error_str = CStr::from_ptr(msg);
+                                Some(c_error_str.to_str().expect("Failed to get error"))
+                            },
+                            _ => None,
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    add_sgobject_put_type!(i32, bindings::TYPE_INT32);
+    add_sgobject_put_type!(i64, bindings::TYPE_INT64);
+    add_sgobject_put_type!(f32, bindings::TYPE_FLOAT32);
+    add_sgobject_put_type!(f64, bindings::TYPE_FLOAT64);
+
     pub struct Version {
         version_ptr: *mut bindings::version_t,
     }

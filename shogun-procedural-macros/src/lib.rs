@@ -20,11 +20,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 let c_ptr = unsafe { bindings::#create_name_ident(c_string.as_ptr()) };
                 unsafe {
                 match c_ptr {
-                    bindings::sgobject_result { return_code: bindings::sgobject_result_SUCCESS,
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
                                       result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
                                         Ok(#name { ptr })
                                     },
-                    bindings::sgobject_result { return_code: bindings::sgobject_result_ERROR,
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
                         result: bindings::sgobject_result_ResultUnion { error: msg } } => {
                         let c_error_str = CStr::from_ptr(msg);
                         Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
@@ -57,6 +57,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         Err(format!("Cannot handle type {}", c_typename.to_str().expect("Failed to get typename")))
                     },
                 }
+            }
+
+            pub fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Option<&'static str>
+            where T: SGObjectPut {
+                parameter_value.sgobject_put(self.ptr, parameter_name)
             }
         }
 

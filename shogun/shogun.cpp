@@ -1,5 +1,4 @@
 #include "shogun.hpp"
-#include <shogun/base/Version.h>
 #include <shogun/util/factory.h>
 
 #include <type_traits>
@@ -18,6 +17,12 @@ struct C_Visitor {
 	std::pair<TYPE, std::string_view> m_type;
 	void* m_value;
 };
+
+struct Put_Visitor {
+	const void* m_value;
+	const TYPE type;
+};
+
 
 template <typename>
 struct get_type {};
@@ -58,13 +63,7 @@ struct sgobject {
 		VisitorRegister::instance();
 	}
 
-	virtual ~sgobject() {
-		std::visit([](auto&& arg){
-			if (arg)
-				arg.reset();
-			}, 
-			ptr);
-	}
+	~sgobject() = default;
 
 	Any get_parameter(const char* name) const {
 		const auto params = std::visit([&name](auto&& arg){return arg->get_params();}, ptr);
@@ -97,7 +96,7 @@ void VisitorRegister::register_visitor() {
 	using ReturnType = std::conditional_t<is_sg_base<T>::value, std::shared_ptr<SGObject>, T>;
 
 	Any::register_visitor<RegisterType, C_Visitor>(
-		[](RegisterType* val, auto* visitor) {
+		[](RegisterType* val, C_Visitor* visitor) {
 			auto* result = new ReturnType;
 			*result = *val;
 			visitor->m_type = get_type<ReturnType>::type;
@@ -105,6 +104,13 @@ void VisitorRegister::register_visitor() {
 				visitor->m_value = (void*)new sgobject(*val);
 			else
 				visitor->m_value = (void*)result;
+		}
+	);
+	Any::register_visitor<RegisterType, Put_Visitor>(
+		[](RegisterType* val, Put_Visitor* visitor) {
+			if (get_type<ReturnType>::type.first != visitor->type)
+				error("Type mismatch");
+			*val = *static_cast<const RegisterType*>(visitor->m_value);
 		}
 	);
 }
@@ -138,11 +144,11 @@ sgobject_result create_helper(const char* name) {
 	try {
 		auto obj = create<SGType>(name);
 		auto* ptr = new sgobject_t(obj);
-		return {sgobject_result::SUCCESS, ptr};
+		return {RETURN_CODE::SUCCESS, ptr};
 	}
 	catch (const std::exception& e) {
 		sgobject_result result;
-		result.return_code = sgobject_result::ERROR;
+		result.return_code = RETURN_CODE::ERROR;
 		result.result.error = e.what();
 		return result;
 	}
@@ -177,6 +183,18 @@ cvisitor_t* sgobject_get(const sgobject_t* ptr, const char* name) {
 	auto* visitor = new C_Visitor{};
 	param.visit_with(visitor);
 	return visitor;
+}
+
+sgobject_put_result sgobject_put(sgobject_t* ptr, const char* name, const void* value, TYPE type) {
+	const auto& param = ptr->get_parameter(name);
+	auto visitor = Put_Visitor{value, type};
+	try {
+		param.visit_with(&visitor);
+		return {RETURN_CODE::SUCCESS, nullptr};
+	}
+	catch(const std::exception& e) {
+		return {RETURN_CODE::ERROR, e.what()};
+	}
 }
 
 SG_TYPE sgobject_derived_type(const sgobject_t* ptr) {

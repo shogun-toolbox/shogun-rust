@@ -7,15 +7,24 @@ extern "C" {
 	typedef struct sgobject sgobject_t;
 	typedef struct C_Visitor cvisitor_t;
 	
+	enum RETURN_CODE {SUCCESS, ERROR};
+
 	struct sgobject_result
 	{
-		enum {SUCCESS, ERROR} return_code;
+		RETURN_CODE return_code;
 		union ResultUnion
 		{
 			sgobject_t* result;
 			const char* error;
 		} result;
 	};
+
+	struct sgobject_put_result
+	{
+		RETURN_CODE return_code;
+		const char* error;
+	};
+	
 
 	enum TYPE {
 		INT32,
@@ -42,6 +51,7 @@ extern "C" {
 	void destroy_sgobject(sgobject_t*);
 	const char* to_string(const sgobject_t*);
 	cvisitor_t* sgobject_get(const sgobject_t*, const char*);
+	sgobject_put_result sgobject_put(sgobject_t*, const char*, const void*, TYPE);
 	SG_TYPE sgobject_derived_type(const sgobject_t*);
 
 	sgobject_result create_machine(const char*);

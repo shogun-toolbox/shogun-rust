@@ -37,4 +37,22 @@ fn main() {
         Ok(_) => println!("All good"),
         Err(msg) => println!("ShogunException: {}", msg),
     }
+
+    match gaussian.put("log_width", &1.0) {
+        Some(msg) => println!("Failed to put value."),
+        _ => (),
+    }
+
+    match gaussian.put("log_width", &1) {
+        Some(msg) => println!("Failed to put value."),
+        _ => (),
+    }
+        
+    match gaussian.get("log_width") {
+        Ok(value) => match value.downcast_ref::<f64>() {
+            Some(fvalue) => println!("log_width: {}", fvalue),
+            None => println!("log_width not f64"),
+        },
+        Err(msg) => panic!(msg),
+    }
 }
