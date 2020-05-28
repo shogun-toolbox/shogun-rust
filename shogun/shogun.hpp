@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 extern "C" {
 	struct version;
 	struct sgobject;
@@ -38,6 +40,7 @@ extern "C" {
 		SG_KERNEL,
 		SG_MACHINE,
 		SG_DISTANCE,
+		SG_FEATURES,
 	};
 
 	TYPE get_cvisitor_type(const cvisitor_t*);
@@ -52,6 +55,7 @@ extern "C" {
 	const char* to_string(const sgobject_t*);
 	cvisitor_t* sgobject_get(const sgobject_t*, const char*);
 	sgobject_put_result sgobject_put(sgobject_t*, const char*, const void*, TYPE);
+	sgobject_put_result sgobject_put_array(sgobject_t*, const char*, const void*, uint32_t, uint32_t, TYPE);
 	SG_TYPE sgobject_derived_type(const sgobject_t*);
 
 	sgobject_result create_machine(const char*);
@@ -60,4 +64,7 @@ extern "C" {
 	sgobject_result create_kernel(const char*);
 
 	sgobject_result create_distance(const char*);
+
+	sgobject_result create_features(const char*);
+	sgobject_result create_features_from_data(const void*, uint32_t rows, uint32_t cols, TYPE);
 }

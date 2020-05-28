@@ -59,7 +59,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Option<&'static str>
+            pub fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Result<(), String>
             where T: SGObjectPut {
                 parameter_value.sgobject_put(self.ptr, parameter_name)
             }

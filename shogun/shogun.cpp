@@ -1,8 +1,6 @@
 #include "shogun.hpp"
 #include <shogun/util/factory.h>
 
-#include <type_traits>
-
 using namespace shogun;
 
 // taken from cpp reference
@@ -22,7 +20,6 @@ struct Put_Visitor {
 	const void* m_value;
 	const TYPE type;
 };
-
 
 template <typename>
 struct get_type {};
@@ -55,7 +52,7 @@ class VisitorRegister {
 };
 
 struct sgobject {
-	std::variant<std::shared_ptr<Machine>, std::shared_ptr<Kernel>, std::shared_ptr<Distance>> ptr;
+	std::variant<std::shared_ptr<Machine>, std::shared_ptr<Kernel>, std::shared_ptr<Distance>, std::shared_ptr<Features>> ptr;
 
 	template <typename T, std::enable_if_t<is_sg_base<T>::value>* = nullptr>
 	sgobject(const std::shared_ptr<T>& ptr_): ptr(ptr_) {
@@ -65,11 +62,19 @@ struct sgobject {
 
 	~sgobject() = default;
 
+	std::string get_name() const {
+		return std::visit([](auto&& obj) {
+			return obj->get_name();
+		}, ptr);
+	}
+
 	Any get_parameter(const char* name) const {
 		const auto params = std::visit([&name](auto&& arg){return arg->get_params();}, ptr);
 		const auto param = params.find(std::string(name));
 		if (param != params.end())
 			return param->second->get_value();
+		else
+			error("Could not find parameter {}::{}", get_name(), name);
 	}
 
 	const char* to_string() const {
@@ -113,6 +118,25 @@ void VisitorRegister::register_visitor() {
 			*val = *static_cast<const RegisterType*>(visitor->m_value);
 		}
 	);
+
+	// automatically registers arithmetic types' corresponding SGMatrix and SGVector
+	if constexpr (std::is_arithmetic_v<RegisterType>)
+	{
+		using MatrixType = SGMatrix<RegisterType>;
+		using VectorType = SGVector<RegisterType>;
+
+		Any::register_visitor<VectorType, Put_Visitor>( 
+			[](VectorType* val, Put_Visitor* visitor) {
+				*val = *static_cast<const VectorType*>(visitor->m_value);
+			}
+		);
+
+		Any::register_visitor<MatrixType, Put_Visitor>( 
+			[](MatrixType* val, Put_Visitor* visitor) {
+				*val = *static_cast<const MatrixType*>(visitor->m_value);
+			}
+		);
+	}
 }
 
 VisitorRegister* VisitorRegister::instance() {
@@ -139,10 +163,10 @@ const char* get_version_main(version_t* ptr) {
 	}
 }
 
-template <typename SGType>
-sgobject_result create_helper(const char* name) {
+template <typename SGType, typename... Args>
+sgobject_result create_helper(Args&&... args) {
 	try {
-		auto obj = create<SGType>(name);
+		auto obj = create<SGType>(std::forward<Args>(args)...);
 		auto* ptr = new sgobject_t(obj);
 		return {RETURN_CODE::SUCCESS, ptr};
 	}
@@ -197,11 +221,69 @@ sgobject_put_result sgobject_put(sgobject_t* ptr, const char* name, const void* 
 	}
 }
 
+template <typename T>
+SGMatrix<T> create_matrix_with_copy(const T* data, uint32_t rows, uint32_t cols) {
+	auto mat = SGMatrix<T>(rows, cols);
+	sg_memcpy(mat.matrix, data, rows*cols*sizeof(T));
+	return mat;
+}
+
+sgobject_put_result sgobject_put_array(sgobject_t* ptr, const char* name, const void* data, uint32_t rows, uint32_t cols, TYPE type) {
+	try {
+		const auto& param = ptr->get_parameter(name);
+		// it's a vector
+		if (rows == 0) {
+			// create_matrix_with_copy(const T* data, uint32_t rows, uint32_t cols)
+			error("SGVector not implemented yet.");
+		}
+		else {
+			switch (type)
+			{
+			case TYPE::FLOAT32: {
+				const auto* casted_data = static_cast<const float32_t*>(data);
+				const auto mat = create_matrix_with_copy(casted_data, rows, cols);
+				Put_Visitor visitor{(const void*) &mat};
+				param.visit_with(&visitor);
+			} break;
+			case TYPE::FLOAT64: {
+				auto* casted_data = static_cast<const float64_t*>(data);
+				const auto mat = create_matrix_with_copy(casted_data, rows, cols);
+				Put_Visitor visitor{(const void*) &mat};
+				param.visit_with(&visitor);
+			} break;
+			case TYPE::INT32: {
+				auto* casted_data = static_cast<const int32_t*>(data);
+				const auto mat = create_matrix_with_copy(casted_data, rows, cols);
+				Put_Visitor visitor{(const void*) &mat};
+				param.visit_with(&visitor);
+			} break;
+			case TYPE::INT64: {
+				auto* casted_data = static_cast<const int64_t*>(data);
+				const auto mat = create_matrix_with_copy(casted_data, rows, cols);
+				Put_Visitor visitor{(const void*) &mat};
+				param.visit_with(&visitor);
+			} break;
+			default: {
+				sgobject_put_result result;
+				result.return_code = RETURN_CODE::ERROR;
+				result.error = "Cannot handle scalar type for SGMatrix";
+				return result;	
+			};
+			}
+		}
+		return {RETURN_CODE::SUCCESS, nullptr};
+	}
+	catch(const std::exception& e) {
+		return {RETURN_CODE::ERROR, e.what()};
+	}
+}
+
 SG_TYPE sgobject_derived_type(const sgobject_t* ptr) {
 	return std::visit( overloaded {
 		[](const std::shared_ptr<Kernel>&){return SG_TYPE::SG_KERNEL;},
 		[](const std::shared_ptr<Machine>&){return SG_TYPE::SG_MACHINE;},
 		[](const std::shared_ptr<Distance>&){return SG_TYPE::SG_DISTANCE;},
+		[](const std::shared_ptr<Features>&){return SG_TYPE::SG_FEATURES;},
 	}, ptr->ptr);
 }
 
@@ -215,4 +297,40 @@ const char* get_cvisitor_typename(const cvisitor_t* ptr) {
 
 void* get_cvisitor_pointer(const cvisitor_t* ptr) {
 	return ptr->m_value;
+}
+
+sgobject_result create_features(const char* name) {
+	return create_helper<Features>(name);
+}
+
+sgobject_result create_features_from_data(const void* data, uint32_t rows, uint32_t cols, TYPE type) {
+	switch (type)
+	{
+	case TYPE::FLOAT32: {
+		const auto* casted_data = static_cast<const float32_t*>(data);
+		auto mat = create_matrix_with_copy(casted_data, rows, cols);
+		return create_helper<Features>(mat);
+	} break;
+	case TYPE::FLOAT64: {
+		auto* casted_data = static_cast<const float64_t*>(data);
+		auto mat = create_matrix_with_copy(casted_data, rows, cols);
+		return create_helper<Features>(mat);
+	} break;
+	case TYPE::INT32: {
+		auto* casted_data = static_cast<const int32_t*>(data);
+		auto mat = create_matrix_with_copy(casted_data, rows, cols);
+		return create_helper<Features>(mat);
+	} break;
+	case TYPE::INT64: {
+		auto* casted_data = static_cast<const int64_t*>(data);
+		auto mat = create_matrix_with_copy(casted_data, rows, cols);
+		return create_helper<Features>(mat);
+	} break;
+	default: {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Cannot create a Features object from provided data";
+		return result;	
+	};
+	}
 }

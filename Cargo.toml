@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 shogun-rust-procedural = {verion = "0.1.0", path = "shogun-procedural-macros"}
+ndarray = "0.13.1"
 
 [lib]
 name = "shogun_rust"

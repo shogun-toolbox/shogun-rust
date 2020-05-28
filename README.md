@@ -24,7 +24,7 @@ fn main() {
 
     // also supports put
     match k.put("log_width", &1.0) {
-        Some(msg) => println!("Failed to put value."),
+        Err(msg) => println!("Failed to put value."),
         _ => (),
     }
 
@@ -34,7 +34,7 @@ fn main() {
             Some(fvalue) => println!("GaussianKernel::log_width: {}", fvalue),
             None => println!("GaussianKernel::log_width not of type f64"),
         },
-        Err(msg) => panic!(msg),
+        Err(msg) => panic!("{}", msg),
     }
 }
 ```

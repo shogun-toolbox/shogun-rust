@@ -1,4 +1,5 @@
-use shogun_rust::shogun::{Distance, Kernel, Machine, Version};
+use shogun_rust::shogun::{Distance, Kernel, Machine, Version, Features};
+use ndarray::arr2;
 
 fn main() {
     let version = Version::new();
@@ -39,12 +40,12 @@ fn main() {
     }
 
     match gaussian.put("log_width", &1.0) {
-        Some(msg) => println!("Failed to put value."),
+        Err(msg) => println!("Failed to put value."),
         _ => (),
     }
 
     match gaussian.put("log_width", &1) {
-        Some(msg) => println!("Failed to put value."),
+        Err(msg) => println!("Failed to put value."),
         _ => (),
     }
         
@@ -53,6 +54,19 @@ fn main() {
             Some(fvalue) => println!("log_width: {}", fvalue),
             None => println!("log_width not f64"),
         },
-        Err(msg) => panic!(msg),
+        Err(msg) =>panic!("{}", msg),
     }
+
+    let array1 = arr2(&[[1, 2, 3], [4, 5, 6]]);
+    let array2 = arr2(&[[6, 5, 4], [3, 2, 1]]);
+
+    let features = Features::from_array(&array1).unwrap();
+    println!("{}", features);
+
+    match features.put("feature_matrx", &array2) {
+        Err(msg) => panic!("{}", msg),
+        _ => (),
+    }
+
+    println!("{}", features);
 }
