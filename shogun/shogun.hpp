@@ -21,7 +21,7 @@ extern "C" {
 		} result;
 	};
 
-	struct sgobject_put_result
+	struct Result
 	{
 		RETURN_CODE return_code;
 		const char* error;
@@ -41,6 +41,9 @@ extern "C" {
 		SG_MACHINE,
 		SG_DISTANCE,
 		SG_FEATURES,
+		SG_FILE,
+		SG_COMBINATION_RULE,
+		SG_LABELS,
 	};
 
 	TYPE get_cvisitor_type(const cvisitor_t*);
@@ -54,17 +57,32 @@ extern "C" {
 	void destroy_sgobject(sgobject_t*);
 	const char* to_string(const sgobject_t*);
 	cvisitor_t* sgobject_get(const sgobject_t*, const char*);
-	sgobject_put_result sgobject_put(sgobject_t*, const char*, const void*, TYPE);
-	sgobject_put_result sgobject_put_array(sgobject_t*, const char*, const void*, uint32_t, uint32_t, TYPE);
+	Result sgobject_put(sgobject_t*, const char*, const void*, TYPE);
+	Result sgobject_put_array(sgobject_t*, const char*, const void*, uint32_t, uint32_t, TYPE);
 	SG_TYPE sgobject_derived_type(const sgobject_t*);
 
 	sgobject_result create_machine(const char*);
-	bool train_machine(sgobject_t*);
+	Result train_machine(sgobject_t*, sgobject_t*);
+	sgobject_result apply_machine(sgobject_t*, sgobject_t*);
+	sgobject_result apply_multiclass_machine(sgobject_t*, sgobject_t*);
+
 
 	sgobject_result create_kernel(const char*);
+	Result init_kernel(sgobject_t*, sgobject_t*, sgobject_t*);
 
 	sgobject_result create_distance(const char*);
 
 	sgobject_result create_features(const char*);
 	sgobject_result create_features_from_data(const void*, uint32_t rows, uint32_t cols, TYPE);
+	sgobject_result create_features_from_file(const sgobject_t*);
+
+	sgobject_result create_labels(const char*);
+	sgobject_result create_labels_from_file(const sgobject_t*);
+
+	sgobject_result create_file(const char*);
+	sgobject_result read_csvfile(const char*);
+
+	sgobject_result create_combination_rule(const char*);
+
+	void set_parallel_threads(int32_t);
 }

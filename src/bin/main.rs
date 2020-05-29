@@ -1,14 +1,16 @@
-use shogun_rust::shogun::{Distance, Kernel, Machine, Version, Features};
+use shogun_rust::shogun::{Distance, Kernel, Machine, Version, Features, File, CombinationRule, set_num_threads, Labels};
 use ndarray::arr2;
 
-fn main() {
+fn main() -> Result<(), String> {
     let version = Version::new();
-    println!("Shogun version {}", version.main_version().unwrap());
+    println!("Shogun version {}", version.main_version()?);
 
-    let rf = Machine::new("RandomForest").unwrap();
+    set_num_threads(1);
+
+    let rf = Machine::new("RandomForest")?;
     println!("{}", rf);
 
-    let gaussian = Kernel::new("GaussianKernel").unwrap();
+    let mut gaussian = Kernel::new("GaussianKernel")?;
     println!("{}", gaussian);
     match gaussian.get("log_width") {
         Ok(value) => match value.downcast_ref::<f64>() {
@@ -60,13 +62,38 @@ fn main() {
     let array1 = arr2(&[[1, 2, 3], [4, 5, 6]]);
     let array2 = arr2(&[[6, 5, 4], [3, 2, 1]]);
 
-    let features = Features::from_array(&array1).unwrap();
-    println!("{}", features);
+    let features1 = Features::from_array(&array1)?;
+    let features2 = Features::from_array(&array2)?;
 
-    match features.put("feature_matrx", &array2) {
-        Err(msg) => panic!("{}", msg),
-        _ => (),
-    }
+    gaussian.init(&features1, &features2)?;
 
-    println!("{}", features);
+    println!("{}", gaussian);
+
+    let f_feats_train = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_features_train.dat".to_string())?;
+    let f_feats_test = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_features_test.dat".to_string())?;
+    let f_labels_train = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_labels_train.dat".to_string())?;
+    let f_labels_test = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_labels_test.dat".to_string())?;
+
+    let features_train = Features::from_file(&f_feats_train)?;
+    let features_test = Features::from_file(&f_feats_test)?;
+    let labels_train = Labels::from_file(&f_labels_train)?;
+    let labels_test = Labels::from_file(&f_labels_test)?;
+
+    let mut rand_forest = Machine::new("RandomForest")?;
+    let m_vote = CombinationRule::new("MajorityVote")?;
+
+    rand_forest.put("labels", &labels_train)?;
+    rand_forest.put("num_bags", &100)?;
+    rand_forest.put("combination_rule", &m_vote)?;
+    rand_forest.put("seed", &1)?;
+
+    println!("{}", rand_forest);
+
+    rand_forest.train(&features_train)?;
+
+    let predictions = rand_forest.apply(&features_test)?;
+
+    println!("{}", predictions);
+
+    Ok(())
 }

@@ -52,11 +52,21 @@ class VisitorRegister {
 };
 
 struct sgobject {
-	std::variant<std::shared_ptr<Machine>, std::shared_ptr<Kernel>, std::shared_ptr<Distance>, std::shared_ptr<Features>> ptr;
+	std::variant<std::shared_ptr<Machine>, 
+			     std::shared_ptr<Kernel>, 
+				 std::shared_ptr<Distance>, 
+				 std::shared_ptr<Features>,
+				 std::shared_ptr<File>,
+				 std::shared_ptr<CombinationRule>,
+				 std::shared_ptr<Labels>> ptr;
 
 	template <typename T, std::enable_if_t<is_sg_base<T>::value>* = nullptr>
 	sgobject(const std::shared_ptr<T>& ptr_): ptr(ptr_) {
 		// singleton pattern ensures we only register visitors once
+		VisitorRegister::instance();
+	}
+
+	sgobject(const std::shared_ptr<File>& ptr_): ptr(ptr_) {
 		VisitorRegister::instance();
 	}
 
@@ -65,6 +75,18 @@ struct sgobject {
 	std::string get_name() const {
 		return std::visit([](auto&& obj) {
 			return obj->get_name();
+		}, ptr);
+	}
+
+	SG_TYPE derived_type() const {
+		return std::visit( overloaded {
+			[](const std::shared_ptr<Kernel>&){return SG_TYPE::SG_KERNEL;},
+			[](const std::shared_ptr<Machine>&){return SG_TYPE::SG_MACHINE;},
+			[](const std::shared_ptr<Distance>&){return SG_TYPE::SG_DISTANCE;},
+			[](const std::shared_ptr<Features>&){return SG_TYPE::SG_FEATURES;},
+			[](const std::shared_ptr<File>&){return SG_TYPE::SG_FILE;},
+			[](const std::shared_ptr<CombinationRule>&){return SG_TYPE::SG_COMBINATION_RULE;},
+			[](const std::shared_ptr<Labels>&){return SG_TYPE::SG_LABELS;},
 		}, ptr);
 	}
 
@@ -93,6 +115,27 @@ VisitorRegister::VisitorRegister () {
 	register_visitor<Kernel>();
 	register_visitor<Machine>();
 	register_visitor<Distance>();
+	register_visitor<Features>();
+	register_visitor<CombinationRule>();
+	register_visitor<Labels>();
+}
+
+/** Helper function to handle type casting internally.
+ * Returns false if it didn't manage to cast lhs to rhs.
+ */
+template <typename T>
+bool internal_type_promotions_compare_types(TYPE rhs, T* val_lhs, const void* val_rhs) {
+	if constexpr (std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t>)
+	{
+		if (rhs == INT32)
+			*val_lhs = *static_cast<const int32_t*>(val_rhs);
+		else if (rhs == INT64)
+			*val_lhs = *static_cast<const int64_t*>(val_rhs);
+		else
+			return true;
+		return false;
+	}
+	return false;
 }
 
 template <typename T>
@@ -113,9 +156,24 @@ void VisitorRegister::register_visitor() {
 	);
 	Any::register_visitor<RegisterType, Put_Visitor>(
 		[](RegisterType* val, Put_Visitor* visitor) {
-			if (get_type<ReturnType>::type.first != visitor->type)
-				error("Type mismatch");
-			*val = *static_cast<const RegisterType*>(visitor->m_value);
+			if (!internal_type_promotions_compare_types(
+				visitor->type, val, visitor->m_value)) {
+				// if the types were not casted internally check if types match exactly
+				if (get_type<ReturnType>::type.first != visitor->type) {
+					error("Type mismatch");
+				}
+				if constexpr (is_sg_base<T>::value) {
+					auto obj = static_cast<const sgobject_t*>(visitor->m_value);
+					if (std::holds_alternative<RegisterType>(obj->ptr))
+						*val = std::get<RegisterType>(obj->ptr);
+					else
+						error("SGObject type mismatch");
+				}
+				else {
+					// if we got here types match exactly so can static_cast
+					*val = *static_cast<const RegisterType*>(visitor->m_value);
+				}
+			}
 		}
 	);
 
@@ -150,6 +208,10 @@ version_t* create_version() {
 	return ptr;
 }
 
+void set_parallel_threads(int32_t n_threads) {
+	env()->set_num_threads(n_threads);
+}
+
 void destroy_version(version_t* ptr) {
 	if (ptr) {
 		ptr->obj.reset();
@@ -182,6 +244,74 @@ sgobject_result create_machine(const char* name) {
 	return create_helper<Machine>(name);
 }
 
+Result train_machine(sgobject_t* machine, sgobject_t* features) {
+	if (!std::holds_alternative<std::shared_ptr<Machine>>(machine->ptr))
+		return {RETURN_CODE::ERROR, "Expected training to be done with Machine type"};
+	if (!std::holds_alternative<std::shared_ptr<Features>>(features->ptr))
+		return {RETURN_CODE::ERROR, "Expected training to be done on Features type"};
+	try {
+		std::get<std::shared_ptr<Machine>>(machine->ptr)->train(
+			std::get<std::shared_ptr<Features>>(features->ptr)
+		);
+		return {RETURN_CODE::SUCCESS, nullptr};
+	}
+	catch (std::exception& e) {
+		return {RETURN_CODE::ERROR, e.what()};
+	}
+}
+
+sgobject_result apply_machine(sgobject_t* machine, sgobject_t* features) {
+	if (!std::holds_alternative<std::shared_ptr<Machine>>(machine->ptr)) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected inference to be done with Machine type";
+		return result;
+	}
+	if (!std::holds_alternative<std::shared_ptr<Features>>(features->ptr)) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected inference to be done on Features type";
+		return result;
+	}
+	try {
+		auto result = std::get<std::shared_ptr<Machine>>(machine->ptr)->apply(std::get<std::shared_ptr<Features>>(features->ptr));
+		auto* ptr = new sgobject_t(result);
+		return {RETURN_CODE::SUCCESS, ptr};
+	}
+	catch (const std::exception& e) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = e.what();
+		return result;
+	} 
+}
+
+sgobject_result apply_multiclass_machine(sgobject_t* machine, sgobject_t* features) {
+	if (!std::holds_alternative<std::shared_ptr<Machine>>(machine->ptr)) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected inference to be done with Machine type";
+		return result;
+	}
+	if (!std::holds_alternative<std::shared_ptr<Features>>(features->ptr)) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected inference to be done on Features type";
+		return result;
+	}
+	try {
+		auto result = std::get<std::shared_ptr<Machine>>(machine->ptr)->apply_multiclass(std::get<std::shared_ptr<Features>>(features->ptr));
+		auto* ptr = new sgobject_t(std::static_pointer_cast<Labels>(result));
+		return {RETURN_CODE::SUCCESS, ptr};
+	}
+	catch (const std::exception& e) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = e.what();
+		return result;
+	} 
+}
+
 sgobject_result create_kernel(const char* name) {
 	return create_helper<Kernel>(name);
 }
@@ -209,9 +339,11 @@ cvisitor_t* sgobject_get(const sgobject_t* ptr, const char* name) {
 	return visitor;
 }
 
-sgobject_put_result sgobject_put(sgobject_t* ptr, const char* name, const void* value, TYPE type) {
+Result sgobject_put(sgobject_t* ptr, const char* name, const void* value, TYPE type) {
 	const auto& param = ptr->get_parameter(name);
 	auto visitor = Put_Visitor{value, type};
+	if (type == SGOBJECT)
+		visitor.m_value = std::visit([](auto&& obj){return (void*)&obj;}, static_cast<const sgobject_t*>(value)->ptr);
 	try {
 		param.visit_with(&visitor);
 		return {RETURN_CODE::SUCCESS, nullptr};
@@ -228,7 +360,7 @@ SGMatrix<T> create_matrix_with_copy(const T* data, uint32_t rows, uint32_t cols)
 	return mat;
 }
 
-sgobject_put_result sgobject_put_array(sgobject_t* ptr, const char* name, const void* data, uint32_t rows, uint32_t cols, TYPE type) {
+Result sgobject_put_array(sgobject_t* ptr, const char* name, const void* data, uint32_t rows, uint32_t cols, TYPE type) {
 	try {
 		const auto& param = ptr->get_parameter(name);
 		// it's a vector
@@ -264,10 +396,7 @@ sgobject_put_result sgobject_put_array(sgobject_t* ptr, const char* name, const 
 				param.visit_with(&visitor);
 			} break;
 			default: {
-				sgobject_put_result result;
-				result.return_code = RETURN_CODE::ERROR;
-				result.error = "Cannot handle scalar type for SGMatrix";
-				return result;	
+				return {RETURN_CODE::ERROR, "Cannot handle scalar type for SGMatrix"};	
 			};
 			}
 		}
@@ -279,12 +408,7 @@ sgobject_put_result sgobject_put_array(sgobject_t* ptr, const char* name, const 
 }
 
 SG_TYPE sgobject_derived_type(const sgobject_t* ptr) {
-	return std::visit( overloaded {
-		[](const std::shared_ptr<Kernel>&){return SG_TYPE::SG_KERNEL;},
-		[](const std::shared_ptr<Machine>&){return SG_TYPE::SG_MACHINE;},
-		[](const std::shared_ptr<Distance>&){return SG_TYPE::SG_DISTANCE;},
-		[](const std::shared_ptr<Features>&){return SG_TYPE::SG_FEATURES;},
-	}, ptr->ptr);
+	return ptr->derived_type();
 }
 
 TYPE get_cvisitor_type(const cvisitor_t* ptr) {
@@ -333,4 +457,60 @@ sgobject_result create_features_from_data(const void* data, uint32_t rows, uint3
 		return result;	
 	};
 	}
+}
+
+sgobject_result create_features_from_file(const sgobject_t* file) {
+	if (!std::holds_alternative<std::shared_ptr<File>>(file->ptr)) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected file to be of type File";
+		return result;
+	}
+	return create_helper<Features>(std::get<std::shared_ptr<File>>(file->ptr));
+}
+
+sgobject_result create_labels(const char* name) {
+	sgobject_result result;
+	result.return_code = RETURN_CODE::ERROR;
+	result.result.error = "Cannot generate a Labels instance from class name";
+	return result;
+}
+
+sgobject_result create_labels_from_file(const sgobject_t* file) {
+	if (!std::holds_alternative<std::shared_ptr<File>>(file->ptr)) {
+		sgobject_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected file to be of type File";
+		return result;
+	}
+	return create_helper<Labels>(std::get<std::shared_ptr<File>>(file->ptr));
+}
+
+Result init_kernel(sgobject_t* kernel, sgobject_t* lhs, sgobject_t* rhs) {
+	if (!std::holds_alternative<std::shared_ptr<Kernel>>(kernel->ptr)) {
+		return Result{RETURN_CODE::ERROR, "Expected self to be Kernel type."};
+	}
+	if (!std::holds_alternative<std::shared_ptr<Features>>(lhs->ptr)) {
+		return Result{RETURN_CODE::ERROR, "Expected lhs to be of type Features"};
+	}
+	if (!std::holds_alternative<std::shared_ptr<Features>>(rhs->ptr)) {
+		return Result{RETURN_CODE::ERROR, "Expected rhs to be of type Features"};
+	}
+	std::get<std::shared_ptr<Kernel>>(kernel->ptr)->init(
+		std::get<std::shared_ptr<Features>>(lhs->ptr),
+		std::get<std::shared_ptr<Features>>(rhs->ptr)
+	);
+	return {RETURN_CODE::SUCCESS, nullptr};
+}
+
+sgobject_result create_file(const char* name) {
+	return create_helper<File>(name);
+}
+
+sgobject_result read_csvfile(const char* filepath) {
+	return create_helper<CSVFile>(filepath);
+}
+
+sgobject_result create_combination_rule(const char* name) {
+	return create_helper<CombinationRule>(name);
 }

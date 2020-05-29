@@ -12,6 +12,25 @@ pub mod shogun {
             repr.to_str()
                 .expect("Failed to get SGObject representation")
         }
+
+        pub fn handle_result(result: &bindings::Result) -> Result<(), String> {
+            unsafe {
+                match result {
+                    bindings::Result {
+                        return_code: bindings::RETURN_CODE_ERROR,
+                        error: msg,
+                    } => {
+                        let c_error_str = CStr::from_ptr(*msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    }
+                    bindings::Result {
+                        return_code: bindings::RETURN_CODE_SUCCESS,
+                        error: _,
+                    } => Ok(()),
+                    _ => Err("Unexpected return.".to_string())
+                }
+            }
+        }
     }
 
     use crate::bindings;
@@ -37,20 +56,7 @@ pub mod shogun {
                     unsafe {
                         let c_string = CString::new(parameter_name).expect("CString::new failed");
                         let type_erased_parameter = std::mem::transmute::<&$put_type, *const std::ffi::c_void>(&self);
-                        match bindings::sgobject_put(obj, c_string.as_ptr(), type_erased_parameter, $enum_value) {
-                            bindings::sgobject_put_result {
-                                return_code: bindings::RETURN_CODE_ERROR,
-                                error: msg,
-                            } => {
-                                let c_error_str = CStr::from_ptr(msg);
-                                Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                            },
-                            bindings::sgobject_put_result {
-                                return_code: bindings::RETURN_CODE_SUCCESS,
-                                error: _,
-                            } => Ok(()),
-                            _ => Err("Unexpected return.".to_string())
-                        }
+                        details::handle_result(&bindings::sgobject_put(obj, c_string.as_ptr(), type_erased_parameter, $enum_value))
                     }
                 }
             }
@@ -83,6 +89,21 @@ pub mod shogun {
 
     #[derive(SGObject)]
     pub struct Features {
+        ptr: *mut bindings::sgobject,
+    }
+
+    #[derive(SGObject)]
+    pub struct File {
+        ptr: *mut bindings::sgobject,
+    }
+
+    #[derive(SGObject)]
+    pub struct CombinationRule {
+        ptr: *mut bindings::sgobject,
+    }
+
+    #[derive(SGObject)]
+    pub struct Labels {
         ptr: *mut bindings::sgobject,
     }
 
@@ -122,20 +143,7 @@ pub mod shogun {
                         let data = self.as_ptr();
                         let c_string = CString::new(parameter_name).expect("CString::new failed");
                         let type_erased_matrix = std::mem::transmute::<*const $array_type, *const std::ffi::c_void>(data);
-                        match bindings::sgobject_put_array(obj, c_string.as_ptr(), type_erased_matrix, n_rows, n_cols, $enum_value) {
-                            bindings::sgobject_put_result {
-                                return_code: bindings::RETURN_CODE_ERROR,
-                                error: msg,
-                            } => {
-                                let c_error_str = CStr::from_ptr(msg);
-                                Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                            },
-                            bindings::sgobject_put_result {
-                                return_code: bindings::RETURN_CODE_SUCCESS,
-                                error: _,
-                            } => Ok(()),
-                            _ => Err("Unexpected return.".to_string()),
-                        }
+                        details::handle_result(&bindings::sgobject_put_array(obj, c_string.as_ptr(), type_erased_matrix, n_rows, n_cols, $enum_value))
                     }
                 }
             }       
@@ -152,6 +160,116 @@ pub mod shogun {
         where Array2<T>: MatrixToFeatures {
             array.create_features_from_matrix()
         }
+
+        pub fn from_file(file: &File) -> Result<Features, String> {
+            unsafe {
+                let c_ptr = bindings::create_features_from_file(file.ptr);
+                match c_ptr {
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
+                                      result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                                        Ok(Features { ptr })
+                                    },
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
+                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
+                }
+            }
+        }
+    }
+
+    impl Kernel {
+        pub fn init(&mut self, lhs: &Features, rhs: &Features) -> Result<(), String> {
+            unsafe {
+                details::handle_result(&bindings::init_kernel(self.ptr, lhs.ptr, rhs.ptr))
+            }
+        }
+    }
+
+    impl Machine {
+        pub fn train(&mut self, features: &Features) -> Result<(), String> {
+            unsafe {
+                details::handle_result(&bindings::train_machine(self.ptr, features.ptr))
+            }
+        }
+        pub fn apply(&self, features: &Features) -> Result<Labels, String> {
+            unsafe {
+                let c_ptr = bindings::apply_machine(self.ptr, features.ptr);
+                match c_ptr {
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
+                                      result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                                        Ok(Labels { ptr })
+                                    },
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
+                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
+                }
+            }
+        }
+
+        pub fn apply_multiclass(&self, features: &Features) -> Result<Labels, String> {
+            unsafe {
+                let c_ptr = bindings::apply_multiclass_machine(self.ptr, features.ptr);
+                match c_ptr {
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
+                                      result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                                        Ok(Labels { ptr })
+                                    },
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
+                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
+                }
+            }
+        }
+    }
+
+    impl File {
+        pub fn read_csv(filepath: String) -> Result<Self, String> {
+            unsafe {
+                let c_string = CString::new(filepath).expect("CString::new failed");
+                let c_ptr = bindings::read_csvfile(c_string.as_ptr());
+                match c_ptr {
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
+                                      result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                                        Ok(File { ptr })
+                                    },
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
+                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
+                }
+            }
+        }
+    }
+
+    impl Labels {
+        pub fn from_file(file: &File) -> Result<Labels, String> {
+            unsafe {
+                let c_ptr = bindings::create_labels_from_file(file.ptr);
+                match c_ptr {
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
+                                    result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                                        Ok(Labels { ptr })
+                                    },
+                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
+                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
+                }
+            }
+        }
     }
 
     impl Version {
@@ -161,11 +279,19 @@ pub mod shogun {
             }
         }
 
-        pub fn main_version(&self) -> Result<&'static str, Utf8Error> {
+        pub fn main_version(&self) -> Result<String, String> {
             let char_ptr = unsafe { bindings::get_version_main(self.version_ptr) };
             let c_str = unsafe { CStr::from_ptr(char_ptr) };
-            c_str.to_str()
+            match c_str.to_str() {
+                Err(x) => Err(x.to_string()),
+                Ok(x) => Ok(x.to_string()),
+            }
         }
+    }
+
+
+    pub fn set_num_threads(n_threads: i32) {
+        unsafe {bindings::set_parallel_threads(n_threads)};
     }
 
     impl Drop for Version {
