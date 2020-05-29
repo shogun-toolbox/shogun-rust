@@ -31,15 +31,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
         impl #name {
             pub fn new(#lower_name_ident: &'static str) -> Result<Self, String> {
                 let c_string = CString::new(#lower_name_ident).expect("CString::new failed");
-                let c_ptr = unsafe { bindings::#create_name_ident(c_string.as_ptr()) };
+                let c_ptr = unsafe { shogun_sys::#create_name_ident(c_string.as_ptr()) };
                 unsafe {
                 match c_ptr {
-                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_SUCCESS,
-                                      result: bindings::sgobject_result_ResultUnion { result: ptr } } => {
+                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
+                                      result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
                                         Ok(#name { ptr })
                                     },
-                    bindings::sgobject_result { return_code: bindings::RETURN_CODE_ERROR,
-                        result: bindings::sgobject_result_ResultUnion { error: msg } } => {
+                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
+                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
                         let c_error_str = CStr::from_ptr(msg);
                         Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
                     },
@@ -49,28 +49,28 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
             pub fn get(&self, parameter_name: &'static str) -> Result<Box<dyn std::any::Any>, String> {
                 let c_string = CString::new(parameter_name).expect("CString::new failed");
-                let c_visitor = unsafe { bindings::sgobject_get(self.ptr, c_string.as_ptr())};
-                let c_visitor_type = unsafe {bindings::get_cvisitor_type(c_visitor)};
+                let c_visitor = unsafe { shogun_sys::sgobject_get(self.ptr, c_string.as_ptr())};
+                let c_visitor_type = unsafe {shogun_sys::get_cvisitor_type(c_visitor)};
                 match c_visitor_type {
-                    bindings::TYPE_FLOAT32 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut f32)}),
-                    bindings::TYPE_FLOAT64 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut f64)}),
-                    bindings::TYPE_INT32 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut i32)}),
-                    bindings::TYPE_INT64 => Ok(unsafe {Box::from_raw(bindings::get_cvisitor_pointer(c_visitor) as *mut i64)}),
-                    bindings::TYPE_SGOBJECT => {
-                        let obj = unsafe { bindings::get_cvisitor_pointer(c_visitor) as *mut bindings::sgobject_t };
-                        let obj_type = unsafe {bindings::sgobject_derived_type(obj)};
+                    shogun_sys::TYPE_FLOAT32 => Ok(unsafe {Box::from_raw(shogun_sys::get_cvisitor_pointer(c_visitor) as *mut f32)}),
+                    shogun_sys::TYPE_FLOAT64 => Ok(unsafe {Box::from_raw(shogun_sys::get_cvisitor_pointer(c_visitor) as *mut f64)}),
+                    shogun_sys::TYPE_INT32 => Ok(unsafe {Box::from_raw(shogun_sys::get_cvisitor_pointer(c_visitor) as *mut i32)}),
+                    shogun_sys::TYPE_INT64 => Ok(unsafe {Box::from_raw(shogun_sys::get_cvisitor_pointer(c_visitor) as *mut i64)}),
+                    shogun_sys::TYPE_SGOBJECT => {
+                        let obj = unsafe { shogun_sys::get_cvisitor_pointer(c_visitor) as *mut shogun_sys::sgobject_t };
+                        let obj_type = unsafe {shogun_sys::sgobject_derived_type(obj)};
                         match obj_type {
-                            bindings::SG_TYPE_SG_KERNEL => Ok(Box::new(Kernel{ptr: obj})),
-                            bindings::SG_TYPE_SG_DISTANCE => Ok(Box::new(Distance{ptr: obj})),
-                            bindings::SG_TYPE_SG_MACHINE => Ok(Box::new(Machine{ptr: obj})),
-                            bindings::SG_TYPE_SG_FEATURES => Ok(Box::new(Features{ptr: obj})),
-                            bindings::SG_TYPE_SG_FILE => Ok(Box::new(File{ptr: obj})),
-                            bindings::SG_TYPE_SG_COMBINATION_RULE => Ok(Box::new(CombinationRule{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_KERNEL => Ok(Box::new(Kernel{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_DISTANCE => Ok(Box::new(Distance{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_MACHINE => Ok(Box::new(Machine{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_FEATURES => Ok(Box::new(Features{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_FILE => Ok(Box::new(File{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_COMBINATION_RULE => Ok(Box::new(CombinationRule{ptr: obj})),
                             _ => Err(format!("Cannot handle type")),
                         }
                     },
                     _ => {
-                        let c_typename = unsafe { CStr::from_ptr(bindings::get_cvisitor_typename(c_visitor)) };
+                        let c_typename = unsafe { CStr::from_ptr(shogun_sys::get_cvisitor_typename(c_visitor)) };
                         Err(format!("Cannot handle type {}", c_typename.to_str().expect("Failed to get typename")))
                     },
                 }
@@ -83,11 +83,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
 
         impl SGObjectPut for #name {
-            fn sgobject_put(&self, obj: *mut bindings::sgobject, parameter_name: &'static str) -> Result<(), String> {
+            fn sgobject_put(&self, obj: *mut shogun_sys::sgobject, parameter_name: &'static str) -> Result<(), String> {
                 unsafe {
                     let c_string = CString::new(parameter_name).expect("CString::new failed");
-                    let type_erased_parameter = std::mem::transmute::<*mut bindings::sgobject, *const std::ffi::c_void>(self.ptr);
-                    details::handle_result(&bindings::sgobject_put(obj, c_string.as_ptr(), type_erased_parameter, bindings::TYPE_SGOBJECT))
+                    let type_erased_parameter = std::mem::transmute::<*mut shogun_sys::sgobject, *const std::ffi::c_void>(self.ptr);
+                    details::handle_result(&shogun_sys::sgobject_put(obj, c_string.as_ptr(), type_erased_parameter, shogun_sys::TYPE_SGOBJECT))
                 }
             }
         }
@@ -100,7 +100,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
         impl Drop for #name {
             fn drop(&mut self) {
-                unsafe { bindings::destroy_sgobject(self.ptr) };
+                unsafe { shogun_sys::destroy_sgobject(self.ptr) };
             }
         }
 

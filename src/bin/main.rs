@@ -1,4 +1,4 @@
-use shogun_rust::shogun::{Distance, Kernel, Machine, Version, Features, File, CombinationRule, set_num_threads, Labels};
+use shogun::shogun::{Distance, Kernel, Machine, Version, Features, File, CombinationRule, set_num_threads, Labels};
 use ndarray::arr2;
 
 fn main() -> Result<(), String> {
@@ -42,12 +42,12 @@ fn main() -> Result<(), String> {
     }
 
     match gaussian.put("log_width", &1.0) {
-        Err(msg) => println!("Failed to put value."),
+        Err(_) => println!("Failed to put value."),
         _ => (),
     }
 
     match gaussian.put("log_width", &1) {
-        Err(msg) => println!("Failed to put value."),
+        Err(_) => println!("Failed to put value."),
         _ => (),
     }
         

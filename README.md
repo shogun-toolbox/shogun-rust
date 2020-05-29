@@ -7,11 +7,25 @@ Note: this is just a Rust wrapper for the shogun C++ library so the internals/AP
 
 More information about the design can be found [here](https://gf712.github.io/programming/2020/05/28/shogun-rust.html).
 
+# Build
+
+Assumes you have shogun-static installed locally, as well as spdlog. If not found CMake will throw an error.
+
+To build simply:
+```bash
+cargo build
+```
+
+And then from another crate:
+```rust
+extern crate shogun;
+```
+
 # Example
 
 ## Basic API
 ```rust
-use shogun_rust::shogun::{Kernel, Version};
+use shogun::shogun::{Kernel, Version};
 
 fn main() {
     let version = Version::new();

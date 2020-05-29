@@ -3,6 +3,8 @@ name = "shogun-rust-procedural"
 version = "0.1.0"
 authors = ["gf712 <gil_f.hoben@hotmail.com>"]
 edition = "2018"
+description = "Procedural macros to build shogun.rs"
+license = "BSD-3-Clause"
 
 [lib]
 proc-macro = true
