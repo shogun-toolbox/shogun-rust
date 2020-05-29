@@ -66,6 +66,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                             shogun_sys::SG_TYPE_SG_FEATURES => Ok(Box::new(Features{ptr: obj})),
                             shogun_sys::SG_TYPE_SG_FILE => Ok(Box::new(File{ptr: obj})),
                             shogun_sys::SG_TYPE_SG_COMBINATION_RULE => Ok(Box::new(CombinationRule{ptr: obj})),
+                            shogun_sys::SG_TYPE_SG_EVALUATION => Ok(Box::new(Evaluation{ptr: obj})),
                             _ => Err(format!("Cannot handle type")),
                         }
                     },

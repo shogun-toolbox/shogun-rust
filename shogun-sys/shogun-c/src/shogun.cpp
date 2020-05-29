@@ -58,7 +58,8 @@ struct sgobject {
 				 std::shared_ptr<Features>,
 				 std::shared_ptr<File>,
 				 std::shared_ptr<CombinationRule>,
-				 std::shared_ptr<Labels>> ptr;
+				 std::shared_ptr<Labels>,
+				 std::shared_ptr<Evaluation>> ptr;
 
 	template <typename T, std::enable_if_t<is_sg_base<T>::value>* = nullptr>
 	sgobject(const std::shared_ptr<T>& ptr_): ptr(ptr_) {
@@ -87,6 +88,7 @@ struct sgobject {
 			[](const std::shared_ptr<File>&){return SG_TYPE::SG_FILE;},
 			[](const std::shared_ptr<CombinationRule>&){return SG_TYPE::SG_COMBINATION_RULE;},
 			[](const std::shared_ptr<Labels>&){return SG_TYPE::SG_LABELS;},
+			[](const std::shared_ptr<Evaluation>&){return SG_TYPE::SG_EVALUATION;},
 		}, ptr);
 	}
 
@@ -118,6 +120,7 @@ VisitorRegister::VisitorRegister () {
 	register_visitor<Features>();
 	register_visitor<CombinationRule>();
 	register_visitor<Labels>();
+	register_visitor<Evaluation>();
 }
 
 /** Helper function to handle type casting internally.
@@ -132,8 +135,8 @@ bool internal_type_promotions_compare_types(TYPE rhs, T* val_lhs, const void* va
 		else if (rhs == INT64)
 			*val_lhs = *static_cast<const int64_t*>(val_rhs);
 		else
-			return true;
-		return false;
+			return false;
+		return true;
 	}
 	return false;
 }
@@ -513,4 +516,34 @@ sgobject_result read_csvfile(const char* filepath) {
 
 sgobject_result create_combination_rule(const char* name) {
 	return create_helper<CombinationRule>(name);
+}
+
+sgobject_result create_evaluation(const char* name) {
+	return create_helper<Evaluation>(name);
+}
+
+float64_result evaluate_labels(sgobject* self, sgobject_t* y_pred, sgobject_t* y_true) {
+	if (!std::holds_alternative<std::shared_ptr<Evaluation>>(self->ptr)) {
+		float64_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected self to be Evaluation type.";
+		return result;
+	}
+	if (!std::holds_alternative<std::shared_ptr<Labels>>(y_pred->ptr)) {
+		float64_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected y_pred to be Labels type.";
+		return result;
+	}
+	if (!std::holds_alternative<std::shared_ptr<Labels>>(y_true->ptr)) {
+		float64_result result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = "Expected y_true to be Labels type.";
+		return result;
+	}
+	auto result = std::get<std::shared_ptr<Evaluation>>(self->ptr)->evaluate(
+		std::get<std::shared_ptr<Labels>>(y_pred->ptr),
+		std::get<std::shared_ptr<Labels>>(y_true->ptr)
+	);
+	return {RETURN_CODE::SUCCESS, result};
 }

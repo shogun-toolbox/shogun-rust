@@ -1,4 +1,4 @@
-use shogun::shogun::{Distance, Kernel, Machine, Version, Features, File, CombinationRule, set_num_threads, Labels};
+use shogun::shogun::{Distance, Kernel, Machine, Version, Features, File, CombinationRule, set_num_threads, Labels, Evaluation};
 use ndarray::arr2;
 
 fn main() -> Result<(), String> {
@@ -83,7 +83,8 @@ fn main() -> Result<(), String> {
     let m_vote = CombinationRule::new("MajorityVote")?;
 
     rand_forest.put("labels", &labels_train)?;
-    rand_forest.put("num_bags", &100)?;
+    rand_forest.put("num_bags", &(100 as i64))?;
+    rand_forest.put("num_bags", &(100 as i32))?;
     rand_forest.put("combination_rule", &m_vote)?;
     rand_forest.put("seed", &1)?;
 
@@ -94,6 +95,12 @@ fn main() -> Result<(), String> {
     let predictions = rand_forest.apply(&features_test)?;
 
     println!("{}", predictions);
+
+    let acc = Evaluation::new("MulticlassAccuracy")?;
+    rand_forest.put("oob_evaluation_metric", &acc)?;
+    let accuracy = acc.evaluate(&predictions, &labels_test)?;
+
+    println!("Model accuracy: {}", accuracy);
 
     Ok(())
 }

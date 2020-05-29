@@ -104,6 +104,10 @@ pub mod shogun {
         ptr: *mut shogun_sys::sgobject,
     }
 
+    #[derive(SGObject)]
+    pub struct Evaluation {
+        ptr: *mut shogun_sys::sgobject,
+    }
     pub trait MatrixToFeatures {
         fn create_features_from_matrix(&self) -> Result<Features, String>;
     }
@@ -260,6 +264,26 @@ pub mod shogun {
                                     },
                     shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
                         result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
+                        let c_error_str = CStr::from_ptr(msg);
+                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                    },
+                    _ => Err(format!("Unexpected return."))
+                }
+            }
+        }
+    }
+
+    impl Evaluation {
+        pub fn evaluate(&self, y_pred: &Labels, y_true: &Labels) -> Result<f64, String> {
+            unsafe {
+                let c_ptr = shogun_sys::evaluate_labels(self.ptr, y_pred.ptr, y_true.ptr);
+                match c_ptr {
+                    shogun_sys::float64_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
+                                    result: shogun_sys::float64_result_ResultFloat64Union { result: value } } => {
+                                        Ok( value )
+                                    },
+                    shogun_sys::float64_result { return_code: shogun_sys::RETURN_CODE_ERROR,
+                        result: shogun_sys::float64_result_ResultFloat64Union { error: msg } } => {
                         let c_error_str = CStr::from_ptr(msg);
                         Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
                     },

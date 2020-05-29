@@ -21,6 +21,16 @@ extern "C" {
 		} result;
 	};
 
+	struct float64_result
+	{
+		RETURN_CODE return_code;
+		union ResultFloat64Union
+		{
+			double result;
+			const char* error;
+		} result;
+	};
+
 	struct Result
 	{
 		RETURN_CODE return_code;
@@ -44,6 +54,7 @@ extern "C" {
 		SG_FILE,
 		SG_COMBINATION_RULE,
 		SG_LABELS,
+		SG_EVALUATION,
 	};
 
 	TYPE get_cvisitor_type(const cvisitor_t*);
@@ -83,6 +94,9 @@ extern "C" {
 	sgobject_result read_csvfile(const char*);
 
 	sgobject_result create_combination_rule(const char*);
+
+	sgobject_result create_evaluation(const char*);
+	float64_result evaluate_labels(sgobject_t*, sgobject_t*, sgobject_t*);
 
 	void set_parallel_threads(int32_t);
 }

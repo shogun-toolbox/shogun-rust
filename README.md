@@ -80,5 +80,9 @@ rand_forest.train(&features_train)?;
 
 let predictions = rand_forest.apply(&features_test)?;
 
-println!("{}", predictions);
+let acc = Evaluation::new("MulticlassAccuracy")?;
+rand_forest.put("oob_evaluation_metric", &acc)?;
+let accuracy = acc.evaluate(&predictions, &labels_test)?;
+
+println!("Model accuracy: {}", accuracy);
 ```
