@@ -16,10 +16,20 @@ fn main() {
     println!("cargo:rustc-link-search={}/lib", dst.display());
     println!("cargo:rustc-link-lib=static=shogun-c");
     println!("cargo:rustc-link-search=/home/gf712/shogun/build/src/shogun");
-    println!("cargo:rustc-env=LD_LIBRARY_PATH=/home/gf712/shogun/build/src/shogun");
     println!("cargo:rustc-link-search=/home/gf712/shogun/build/spdlog/src/SpdLog-build/");
-    println!("cargo:rustc-link-lib=dylib=shogun");
+    println!("cargo:rustc-link-lib=static=shogun");
     println!("cargo:rustc-link-lib=static=spdlog");
+    println!("cargo:rustc-link-lib=dylib=gomp");
+    println!("cargo:rustc-link-lib=dylib=pthread");
+    println!("cargo:rustc-link-lib=dylib=lapack");
+    println!("cargo:rustc-link-lib=dylib=blas");
+    println!("cargo:rustc-link-lib=dylib=glpk");
+    println!("cargo:rustc-link-lib=dylib=z");
+    println!("cargo:rustc-link-lib=dylib=protobuf");
+    println!("cargo:rustc-link-lib=dylib=lzma");
+    println!("cargo:rustc-link-lib=dylib=bz2");
+    println!("cargo:rustc-link-lib=dylib=arpack");
+
 
     let bindings = bindgen::Builder::default()
         .clang_arg("-Ishogun")

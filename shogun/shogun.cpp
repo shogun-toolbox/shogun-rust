@@ -8,7 +8,7 @@ template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 struct version {
-	std::unique_ptr<Version> obj;
+	Version* obj;
 };
 
 struct C_Visitor {
@@ -204,7 +204,7 @@ VisitorRegister* VisitorRegister::instance() {
 
 version_t* create_version() {
 	auto* ptr = (version_t*)malloc(sizeof(version_t));
-	ptr->obj = std::make_unique<Version>();
+	ptr->obj = new Version();
 	return ptr;
 }
 
@@ -214,7 +214,7 @@ void set_parallel_threads(int32_t n_threads) {
 
 void destroy_version(version_t* ptr) {
 	if (ptr) {
-		ptr->obj.reset();
+		delete ptr->obj;
 		free(ptr);
 	}
 }
