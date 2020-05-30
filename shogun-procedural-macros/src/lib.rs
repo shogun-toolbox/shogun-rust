@@ -30,24 +30,39 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let tokens = quote! {
         impl #name {
             pub fn new(#lower_name_ident: &'static str) -> Result<Self, String> {
-                let c_string = CString::new(#lower_name_ident).expect("CString::new failed");
+                #name::create(#lower_name_ident)
+            }
+        }
+
+        impl SGObject for #name {
+            type DerivedObject = #name;
+            fn create (name: &'static str) -> Result<Self::DerivedObject, String> {
+                let c_string = CString::new(name).expect("CString::new failed");
                 let c_ptr = unsafe { shogun_sys::#create_name_ident(c_string.as_ptr()) };
                 unsafe {
-                match c_ptr {
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
-                                      result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
-                                        Ok(#name { ptr })
-                                    },
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
-                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
-                        let c_error_str = CStr::from_ptr(msg);
-                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                    },
-                    _ => Err(format!("Unexpected return."))
+                    match c_ptr {
+                        shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
+                                        result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => Ok(#name { ptr }),
+                        shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
+                            result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
+                            let c_error_str = CStr::from_ptr(msg);
+                            Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                        },
+                        _ => Err(format!("Unexpected return."))
+                    }
                 }
             }
+
+            fn to_string(&self) -> &str {
+                return details::sgobject_to_string(self.ptr);
             }
-            pub fn get(&self, parameter_name: &'static str) -> Result<Box<dyn std::any::Any>, String> {
+
+            fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Result<(), String>
+            where T: SGObjectPut {
+                parameter_value.sgobject_put(self.ptr, parameter_name)
+            }
+            
+            fn get(&self, parameter_name: &'static str) -> Result<Box<dyn std::any::Any>, String> {
                 let c_string = CString::new(parameter_name).expect("CString::new failed");
                 let c_visitor = unsafe { shogun_sys::sgobject_get(self.ptr, c_string.as_ptr())};
                 let c_visitor_type = unsafe {shogun_sys::get_cvisitor_type(c_visitor)};
@@ -76,11 +91,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     },
                 }
             }
-
-            pub fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Result<(), String>
-            where T: SGObjectPut {
-                parameter_value.sgobject_put(self.ptr, parameter_name)
-            }
         }
 
         impl SGObjectPut for #name {
@@ -93,9 +103,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl SGObject for #name {
-            fn to_string(&self) -> &str {
-                return details::sgobject_to_string(self.ptr);
+        impl SGObjectFromPtr for #name {
+            type DerivedObject = #name;
+            fn from_ptr(ptr: *mut shogun_sys::sgobject) -> Self::DerivedObject {
+                #name { ptr }
             }
         }
 

@@ -1,4 +1,4 @@
-use shogun::shogun::{File, Features, Machine, CombinationRule, Evaluation, Labels};
+use shogun::shogun::{File, Features, Machine, CombinationRule, Evaluation, Labels, SGObject};
 
 #[test]
 fn random_forest() -> Result<(), String> {

@@ -1,4 +1,4 @@
-use shogun::shogun::{Distance, Kernel, Machine, Version, Features, File, CombinationRule, set_num_threads, Labels, Evaluation};
+use shogun::shogun::{Distance, Kernel, Machine, Version, Features, SGObject};
 use ndarray::arr2;
 
 fn main() -> Result<(), String> {

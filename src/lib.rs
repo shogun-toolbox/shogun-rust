@@ -38,12 +38,45 @@ pub mod shogun {
     extern crate ndarray;
     use ndarray::Array2;
 
-    trait SGObject: fmt::Display {
+    /// The trait that all SGObject derived types require
+    pub trait SGObject: fmt::Display {
+        /// The SGObject derived type
+        type DerivedObject;
+        /// Factory to generate new DerivedObject types from a string
+        fn create(name: &'static str) -> Result<Self::DerivedObject, String>;
+        /// Setter for any type that implementts the SGObjectPut trait 
+        fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Result<(), String> where T: SGObjectPut;
+        fn get(&self, name: &'static str) -> Result<Box<dyn std::any::Any>, String>;
+        /// String representation of the struct
         fn to_string(&self) -> &str;
     }
 
+    pub trait SGObjectFromPtr {
+        type DerivedObject;
+        fn from_ptr(ptr: *mut shogun_sys::sgobject) -> Self::DerivedObject;
+    }
+
+    /// Trait for types that can be put in an SGObject 
     pub trait SGObjectPut {
         fn sgobject_put(&self, obj: *mut shogun_sys::sgobject, name: &'static str) -> Result<(), String>;
+    }
+
+    pub fn handle_sgobject_result<T>(result: &shogun_sys::sgobject_result) -> Result<T::DerivedObject, String>
+    where T: SGObjectFromPtr {
+        unsafe {
+            match result {
+                shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
+                                result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
+                                    Ok(T::from_ptr(*ptr))
+                                },
+                shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
+                    result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
+                    let c_error_str = CStr::from_ptr(*msg);
+                    Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
+                },
+                _ => Err(format!("Unexpected return."))
+            }
+        }
     }
 
     macro_rules! add_sgobject_put_type {
@@ -165,18 +198,7 @@ pub mod shogun {
         pub fn from_file(file: &File) -> Result<Features, String> {
             unsafe {
                 let c_ptr = shogun_sys::create_features_from_file(file.ptr);
-                match c_ptr {
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
-                                      result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
-                                        Ok(Features { ptr })
-                                    },
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
-                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
-                        let c_error_str = CStr::from_ptr(msg);
-                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                    },
-                    _ => Err(format!("Unexpected return."))
-                }
+                handle_sgobject_result::<Self>(&c_ptr)
             }
         }
     }
@@ -198,36 +220,14 @@ pub mod shogun {
         pub fn apply(&self, features: &Features) -> Result<Labels, String> {
             unsafe {
                 let c_ptr = shogun_sys::apply_machine(self.ptr, features.ptr);
-                match c_ptr {
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
-                                      result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
-                                        Ok(Labels { ptr })
-                                    },
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
-                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
-                        let c_error_str = CStr::from_ptr(msg);
-                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                    },
-                    _ => Err(format!("Unexpected return."))
-                }
+                handle_sgobject_result::<Labels>(&c_ptr)
             }
         }
 
         pub fn apply_multiclass(&self, features: &Features) -> Result<Labels, String> {
             unsafe {
                 let c_ptr = shogun_sys::apply_multiclass_machine(self.ptr, features.ptr);
-                match c_ptr {
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
-                                      result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
-                                        Ok(Labels { ptr })
-                                    },
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
-                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
-                        let c_error_str = CStr::from_ptr(msg);
-                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                    },
-                    _ => Err(format!("Unexpected return."))
-                }
+                handle_sgobject_result::<Labels>(&c_ptr)
             }
         }
     }
@@ -237,18 +237,7 @@ pub mod shogun {
             unsafe {
                 let c_string = CString::new(filepath).expect("CString::new failed");
                 let c_ptr = shogun_sys::read_csvfile(c_string.as_ptr());
-                match c_ptr {
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
-                                      result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
-                                        Ok(File { ptr })
-                                    },
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
-                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
-                        let c_error_str = CStr::from_ptr(msg);
-                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                    },
-                    _ => Err(format!("Unexpected return."))
-                }
+                handle_sgobject_result::<Self>(&c_ptr)
             }
         }
     }
@@ -257,18 +246,7 @@ pub mod shogun {
         pub fn from_file(file: &File) -> Result<Labels, String> {
             unsafe {
                 let c_ptr = shogun_sys::create_labels_from_file(file.ptr);
-                match c_ptr {
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_SUCCESS,
-                                    result: shogun_sys::sgobject_result_ResultUnion { result: ptr } } => {
-                                        Ok(Labels { ptr })
-                                    },
-                    shogun_sys::sgobject_result { return_code: shogun_sys::RETURN_CODE_ERROR,
-                        result: shogun_sys::sgobject_result_ResultUnion { error: msg } } => {
-                        let c_error_str = CStr::from_ptr(msg);
-                        Err(format!("{}", c_error_str.to_str().expect("Failed to get error")))
-                    },
-                    _ => Err(format!("Unexpected return."))
-                }
+                handle_sgobject_result::<Labels>(&c_ptr)
             }
         }
     }
