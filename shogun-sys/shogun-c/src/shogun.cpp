@@ -263,19 +263,22 @@ Result train_machine(sgobject_t* machine, sgobject_t* features) {
 	}
 }
 
+template <typename T, typename ResultType=sgobject_result>
+std::optional<ResultType> check_type(const sgobject_t* obj, const char* error_msg) {
+	if (!std::holds_alternative<std::shared_ptr<T>>(obj->ptr)) {
+		ResultType result;
+		result.return_code = RETURN_CODE::ERROR;
+		result.result.error = error_msg;
+		return result;
+	}
+	return {};
+}
+
 sgobject_result apply_machine(sgobject_t* machine, sgobject_t* features) {
-	if (!std::holds_alternative<std::shared_ptr<Machine>>(machine->ptr)) {
-		sgobject_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected inference to be done with Machine type";
-		return result;
-	}
-	if (!std::holds_alternative<std::shared_ptr<Features>>(features->ptr)) {
-		sgobject_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected inference to be done on Features type";
-		return result;
-	}
+	if (auto result = check_type<Machine>(machine, "Expected inference to be done with Machine type"))
+		return *result;
+	if (auto result = check_type<Features>(features, "Expected inference to be done on Features type"))
+		return *result;
 	try {
 		auto result = std::get<std::shared_ptr<Machine>>(machine->ptr)->apply(std::get<std::shared_ptr<Features>>(features->ptr));
 		auto* ptr = new sgobject_t(result);
@@ -290,18 +293,10 @@ sgobject_result apply_machine(sgobject_t* machine, sgobject_t* features) {
 }
 
 sgobject_result apply_multiclass_machine(sgobject_t* machine, sgobject_t* features) {
-	if (!std::holds_alternative<std::shared_ptr<Machine>>(machine->ptr)) {
-		sgobject_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected inference to be done with Machine type";
-		return result;
-	}
-	if (!std::holds_alternative<std::shared_ptr<Features>>(features->ptr)) {
-		sgobject_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected inference to be done on Features type";
-		return result;
-	}
+	if (auto result = check_type<Machine>(machine, "Expected inference to be done with Machine type"))
+		return *result;
+	if (auto result = check_type<Features>(features, "Expected inference to be done on Features type"))
+		return *result;
 	try {
 		auto result = std::get<std::shared_ptr<Machine>>(machine->ptr)->apply_multiclass(std::get<std::shared_ptr<Features>>(features->ptr));
 		auto* ptr = new sgobject_t(std::static_pointer_cast<Labels>(result));
@@ -463,12 +458,8 @@ sgobject_result create_features_from_data(const void* data, uint32_t rows, uint3
 }
 
 sgobject_result create_features_from_file(const sgobject_t* file) {
-	if (!std::holds_alternative<std::shared_ptr<File>>(file->ptr)) {
-		sgobject_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected file to be of type File";
-		return result;
-	}
+	if (auto result = check_type<File>(file, "Expected self to be of type File"))
+		return *result;
 	return create_helper<Features>(std::get<std::shared_ptr<File>>(file->ptr));
 }
 
@@ -480,12 +471,8 @@ sgobject_result create_labels(const char* name) {
 }
 
 sgobject_result create_labels_from_file(const sgobject_t* file) {
-	if (!std::holds_alternative<std::shared_ptr<File>>(file->ptr)) {
-		sgobject_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected file to be of type File";
-		return result;
-	}
+	if (auto result = check_type<File>(file, "Expected self to be of type File"))
+		return *result;
 	return create_helper<Labels>(std::get<std::shared_ptr<File>>(file->ptr));
 }
 
@@ -523,24 +510,12 @@ sgobject_result create_evaluation(const char* name) {
 }
 
 float64_result evaluate_labels(sgobject* self, sgobject_t* y_pred, sgobject_t* y_true) {
-	if (!std::holds_alternative<std::shared_ptr<Evaluation>>(self->ptr)) {
-		float64_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected self to be Evaluation type.";
-		return result;
-	}
-	if (!std::holds_alternative<std::shared_ptr<Labels>>(y_pred->ptr)) {
-		float64_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected y_pred to be Labels type.";
-		return result;
-	}
-	if (!std::holds_alternative<std::shared_ptr<Labels>>(y_true->ptr)) {
-		float64_result result;
-		result.return_code = RETURN_CODE::ERROR;
-		result.result.error = "Expected y_true to be Labels type.";
-		return result;
-	}
+	if (auto result = check_type<Evaluation, float64_result>(self, "Expected self to be of type Evaluation"))
+		return *result;
+	if (auto result = check_type<Labels, float64_result>(y_pred, "Expected y_pred to be of type Labels"))
+		return *result;
+	if (auto result = check_type<Labels, float64_result>(y_true, "Expected y_true to be of type Labels"))
+		return *result;
 	auto result = std::get<std::shared_ptr<Evaluation>>(self->ptr)->evaluate(
 		std::get<std::shared_ptr<Labels>>(y_pred->ptr),
 		std::get<std::shared_ptr<Labels>>(y_true->ptr)
