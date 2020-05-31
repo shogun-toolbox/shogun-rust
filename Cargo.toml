@@ -1,14 +1,17 @@
 [package]
 name = "shogun"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["gf712 <gil_f.hoben@hotmail.com>"]
 edition = "2018"
 description = "Shogun bindings for Rust"
 license = "BSD-3-Clause"
+exclude = [
+    "shogun-data/"
+]
 
 [dependencies]
 shogun-sys = {version = "0.1.0", path = "shogun-sys"}
-shogun-rust-procedural = {version = "0.1.0", path = "shogun-procedural-macros"}
+shogun-rust-procedural = {version = "0.1.1", path = "shogun-procedural-macros"}
 ndarray = "0.13.1"
 
 [lib]

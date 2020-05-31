@@ -3,6 +3,8 @@ name = "shogun-sys"
 version = "0.1.0"
 authors = ["gf712 <gil_f.hoben@hotmail.com>"]
 edition = "2018"
+description = "Shogun rust bindings to C API"
+license = "BSD-3-Clause"
 
 [build-dependencies]
 bindgen = "0.54.0"

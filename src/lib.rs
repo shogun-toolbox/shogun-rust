@@ -32,21 +32,29 @@ pub mod shogun {
         }
     }
 
-    use shogun_rust_procedural::SGObject;
+    use shogun_rust_procedural::{SGObject, getter_reflection};
     use std::ffi::{CStr, CString};
     use std::fmt;
     extern crate ndarray;
     use ndarray::Array2;
 
-    /// The trait that all SGObject derived types require
-    pub trait SGObject: fmt::Display {
+    /// Struct owns a *mut shogun_sys::sgobject
+    pub trait HasSGObjectPtr {
+        fn get_ptr(&self) -> *mut shogun_sys::sgobject;
+    }
+
+    /// The trait that all SGObject derived types have to implement
+    pub trait SGObject: fmt::Display + HasSGObjectPtr {
         /// The SGObject derived type
         type DerivedObject;
         /// Factory to generate new DerivedObject types from a string
         fn create(name: &'static str) -> Result<Self::DerivedObject, String>;
-        /// Setter for any type that implementts the SGObjectPut trait 
-        fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Result<(), String> where T: SGObjectPut;
-        fn get(&self, name: &'static str) -> Result<Box<dyn std::any::Any>, String>;
+        /// Setter for any type that implements the SGObjectPut trait 
+        fn put<T>(&self, parameter_name: &'static str, parameter_value: &T) -> Result<(), String>
+        where T: SGObjectPut {
+            parameter_value.sgobject_put(self.get_ptr(), parameter_name)
+        }
+        getter_reflection!{}
         /// String representation of the struct
         fn to_string(&self) -> &str;
     }

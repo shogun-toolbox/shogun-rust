@@ -1,6 +1,6 @@
 [package]
 name = "shogun-rust-procedural"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["gf712 <gil_f.hoben@hotmail.com>"]
 edition = "2018"
 description = "Procedural macros to build shogun.rs"
@@ -10,5 +10,11 @@ license = "BSD-3-Clause"
 proc-macro = true
 
 [dependencies]
-syn = "1.0"
+syn = { version = "1.0", features = ["full", "extra-traits"] }
 quote = "1.0"
+shogun-sys = {version = "0.1.0", path="../shogun-sys"}
+regex = "1"
+
+[[bin]]
+name = "test"
+path = "src/main.rs"
