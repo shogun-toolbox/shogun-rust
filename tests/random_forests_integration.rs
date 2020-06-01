@@ -5,10 +5,13 @@ fn random_forest() -> Result<(), String> {
 
     set_num_threads(1);
 
-    let f_feats_train = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_features_train.dat".to_string())?;
-    let f_feats_test = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_features_test.dat".to_string())?;
-    let f_labels_train = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_labels_train.dat".to_string())?;
-    let f_labels_test = File::read_csv("/home/gf712/shogun/build/examples/meta/data/classifier_4class_2d_linear_labels_test.dat".to_string())?;
+    let project_root = env!("CARGO_MANIFEST_DIR");
+    let meta_data = format!("{}/shogun-data/toy", project_root);
+
+    let f_feats_train = File::read_csv(format!("{}/classifier_4class_2d_linear_features_train.dat", meta_data))?;
+    let f_feats_test = File::read_csv(format!("{}/classifier_4class_2d_linear_features_test.dat", meta_data))?;
+    let f_labels_train = File::read_csv(format!("{}/classifier_4class_2d_linear_labels_train.dat", meta_data))?;
+    let f_labels_test = File::read_csv(format!("{}/classifier_4class_2d_linear_labels_test.dat", meta_data))?;
 
     let features_train = Features::from_file(&f_feats_train)?;
     let features_test = Features::from_file(&f_feats_test)?;
@@ -24,15 +27,13 @@ fn random_forest() -> Result<(), String> {
     rand_forest.put("seed", &1)?;
 
     rand_forest.train(&features_train)?;
-    println!("{}", rand_forest);
 
     let predictions = rand_forest.apply(&features_test)?;
 
     let acc = Evaluation::new("MulticlassAccuracy")?;
     let accuracy = acc.evaluate(&predictions, &labels_test)?;
 
-    // there is an issue with reproducing results with functions with parallel loops
-    // when called from Rust
+    // there is an issue with reproducing results
     if accuracy > 0.7 {
         Ok(())
     } else {

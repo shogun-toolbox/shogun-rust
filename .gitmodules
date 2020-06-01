@@ -1,0 +1,3 @@
+[submodule "shogun-data"]
+	path = shogun-data
+	url = https://github.com/shogun-toolbox/shogun-data
